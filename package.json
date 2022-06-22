@@ -1,0 +1,22 @@
+{
+	"name": "messenger-archive",
+	"version": "1.0.0",
+	"main": "build/index.js",
+	"type": "module",
+	"author": "Mateusz Pstrucha",
+	"license": "MIT",
+	"scripts": {
+		"dev": "tsc-watch --onSuccess \"node .\""
+	},
+	"dependencies": {
+		"sqlite3": "^5.0.8",
+		"typescript": "^4.7.4",
+		"utf8": "^3.0.0"
+	},
+	"devDependencies": {
+		"@types/sqlite3": "^3.1.8",
+		"@types/utf8": "^3.0.1",
+		"tsc": "^2.0.4",
+		"tsc-watch": "^5.0.3"
+	}
+}
