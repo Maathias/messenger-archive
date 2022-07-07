@@ -1,0 +1,40 @@
+.media
+	.entry
+		padding: .5em
+		border-bottom: 1px solid gray
+
+		&[data-open=true] .header
+			border-bottom: 1px dashed gray
+			padding-bottom: 0.5em
+
+		.header
+			cursor: pointer
+			user-select: none
+
+			i
+				margin-right: .5em
+
+		.preview
+			display: flex
+
+			.info
+				padding: .5em
+
+			.reactions span
+				cursor: help
+				margin-left: .25em
+				padding: 0 2px
+				border-radius: 3px
+
+			& > :first-child
+				min-width: 6em
+				min-height: 6em
+				max-height: 75vh
+				max-width: 50%
+
+			img
+				margin: 0.5em
+				text-align: center
+				display: inline-block
+				border: 1px solid black
+				border-radius: 3px

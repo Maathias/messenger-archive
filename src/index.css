@@ -1,0 +1,70 @@
+@import url('fontello/css/animation.css');
+@import url('fontello/css/fontello.css');
+
+@font-face {
+	font-family: 'Lato';
+	src: url('fonts/Lato-Bold.ttf');
+	src: url('fonts/Lato-Italic.ttf');
+	src: url('fonts/Lato-Light.ttf');
+	src: url('fonts/Lato-Regular.ttf');
+}
+
+@font-face {
+	font-family: 'Monsterrat';
+	src: url('fonts/Montserrat-VariableFont_wght.ttf');
+}
+
+@font-face {
+	font-family: 'Roboto';
+	src: url('fonts/Roboto-Bold.ttf');
+	src: url('fonts/Roboto-Light.ttf');
+	src: url('fonts/Roboto-Medium.ttf');
+	src: url('fonts/Roboto-Thin.ttf');
+}
+
+@font-face {
+	font-family: 'Roboto Mono';
+	src: url('fonts/RobotoMono-VariableFont_wght.ttf');
+}
+
+:root {
+	--color-primary: #006aff;
+	--color-secondary: #16bac5;
+	--color-ternary: #2b2d42;
+	--color-light: #efe9f4;
+	--color-dark: #171d1c;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	font-family: 'Lato';
+	background-blend-mode: luminosity;
+	background: url('./img/terrazzo.webp'),
+		linear-gradient(45deg, #a334fa, #0695ff);
+}
+
+.container {
+	position: fixed;
+	overflow-y: auto;
+	top: 0;
+	bottom: 0;
+	right: 0;
+	left: 4.2rem;
+
+	padding: 1em;
+	margin: 0.5em;
+
+	border: 1px solid #06f5;
+	border-radius: 0.5em;
+	backdrop-filter: blur(5px);
+}
+
+h1,
+h2,
+h3 {
+	font-family: Roboto;
+	border-bottom: 1px solid gray;
+}

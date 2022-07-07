@@ -1,0 +1,54 @@
+.intro
+	top: 1em
+	right: 1em
+	bottom: 1em
+	left: 1em
+	color: var(--color-dark)
+	padding: 1em
+	display: flex
+	flex-direction: column
+	align-items: center
+
+	.header
+		font-size: 2em
+		font-family: 'Roboto'
+
+	.controls
+		margin: 1em 0
+
+	p
+		max-width: 24em
+		text-align: center
+
+	.paths
+		min-width: 25em
+		padding: 0.5em
+		padding-bottom: .6em
+		background-color: #0002
+		border-radius: 3px
+		margin-bottom: 1em
+
+		div:nth-child(2n)
+			background-color: unset
+
+		div
+			width: 100%
+			background-color: #fff1
+
+			i
+				float: right
+				cursor: pointer
+
+				&:hover
+					color: var(--color-secondary)
+
+	.bars
+		margin: 1em 0
+		width: 60%
+
+	.logs
+		font-family: 'Roboto Mono'
+		font-size: .75em
+
+		div span
+			color: red
