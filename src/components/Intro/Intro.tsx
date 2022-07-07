@@ -4,40 +4,43 @@ import Progress from '../Progress/Progress'
 
 import './intro.sass'
 
-type status = {
-	[step: string]: [string, number]
-}
+type status = [string, number]
 
-function beginScan(paths: string[]) {
-	window.Main.send('scan', { paths })
-}
+const totalMasterParts = 4
 
 function Intro() {
-	const [paths, setPaths] = useState(['/home/mathias/Desktop/messages']),
-		[status, setStatus] = useState({
-			main: ['Preparing', 50],
-			sub: ['Checking directories', 10],
-		} as status),
-		[log, addLog] = useState([] as any[])
+	const [paths, setPaths] = useState<string[]>([]),
+		[mainProgress, setMainProgress] = useState<status>([
+			'Waiting for paths',
+			0,
+		]),
+		[subProgress, setSubProgress] = useState<status>(['', 0]),
+		[log, addLog] = useState<any[]>([])
+
+	function beginScan(paths: string[]) {
+		window.invoke('scan', { paths }).then(convosIds => {
+			console.log(convosIds)
+		})
+	}
 
 	useEffect(() => {
-		window.Main.on('add-paths', ({ canceled, filePaths }) => {
-			!canceled &&
-				setPaths(prev => [
-					...prev,
-					...filePaths.filter(p => !prev.includes(p)),
-				])
-		})
-
-		window.Main.on('update-progress', (data: any) => {
-			console.log(data)
-			// setStatus(prev => ({ ...prev, ...data }))
-			addLog(prev => [...prev, data])
+		window.events.on('update-progress', ([level, message, status, err]) => {
+			if (level == 'main') setMainProgress([message, status])
+			if (level == 'sub') setSubProgress([message, status])
+			addLog(prev => [...prev, [level, message, status, err]])
 		})
 	}, [])
 
 	return (
-		<div className="intro">
+		<div
+			className="intro"
+			style={{
+				cursor:
+					mainProgress[1] > 0 && mainProgress[1] < totalMasterParts
+						? 'wait'
+						: 'default',
+			}}
+		>
 			<span className="header">Select paths to scan</span>
 			<p>
 				Add folders with <code>filtered_threads</code>,{' '}
@@ -47,13 +50,29 @@ function Intro() {
 			<div className="controls">
 				<Button
 					label="Open"
-					action={() => window.Main.send('get-paths')}
+					action={() =>
+						window.invoke('get-paths').then(({ canceled, filePaths }) => {
+							!canceled &&
+								setPaths(prev => [
+									...prev,
+									...filePaths.filter(p => !prev.includes(p)),
+								])
+						})
+					}
 					icon="plus-squared"
 				/>
 			</div>
 			<div className="paths">
-				{paths.map(p => (
-					<div key={p}>{p}</div>
+				{paths.map(path => (
+					<div key={path}>
+						{path}
+						<i
+							className="icon-cancel"
+							onClick={() =>
+								setPaths(prev => prev.filter(p => p != path))
+							}
+						></i>
+					</div>
 				))}
 			</div>
 
@@ -65,25 +84,14 @@ function Intro() {
 				/>
 			)}
 
-			{status.main && (
+			{log.length > 0 && (
 				<div className="bars">
-					<Progress label={status.main[0]} status={status.main[1]} />
-					<Progress label={status.sub[0]} status={status.sub[1]} />
-					{/* <div className="logs">
-						{log.map((l, i) => (
-							<div key={i}>
-								{Object.keys(l).map((k, j) => {
-									if (k == 'err')
-										return (
-											<span key={j}>
-												{l[k]?.message ?? l[k]?.code ?? l[k]}
-											</span>
-										)
-									else return `${k} ${l[k][0]} ${l[k][1]}%`
-								})}
-							</div>
-						))}
-					</div> */}
+					<Progress
+						label={mainProgress[0]}
+						steps={[mainProgress[1], totalMasterParts]}
+					/>
+					<Progress label={subProgress[0]} status={subProgress[1]} />
+					{/* TODO: display the logs */}
 				</div>
 			)}
 		</div>

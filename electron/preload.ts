@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
-export const api = {
+export const events = {
 	send: (channel: string, data?: any) => ipcRenderer.send(channel, data),
 
 	on: (channel: string, callback: (data: any) => void) => {
@@ -11,4 +11,8 @@ export const api = {
 		ipcRenderer.removeListener(channel, callback),
 }
 
-contextBridge.exposeInMainWorld('Main', api)
+contextBridge.exposeInMainWorld('events', events)
+
+export const invoke = ipcRenderer.invoke
+
+contextBridge.exposeInMainWorld('invoke', invoke)

@@ -1,8 +1,9 @@
-import { api } from '../../electron/preload'
+import { events, invoke } from '../../electron/preload'
 
 declare global {
 	// eslint-disable-next-line
 	interface Window {
-		Main: typeof api
+		events: typeof events
+		invoke: typeof invoke
 	}
 }

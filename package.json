@@ -4,7 +4,11 @@
 	"description": "",
 	"main": "build/electron.js",
 	"scripts": {
-		"start": "yarn webpack && yarn electron . --trace-warnings"
+		"build": "yarn webpack",
+		"start": "yarn electron . --trace-warnings --inspect",
+		"dev": "yarn build --mode development && yarn start",
+		"web": "yarn webpack-dev-server --config react.webpack.config.js",
+		"dist": "# TODO: add electron-builder and github actions config"
 	},
 	"author": "Mateusz Pstrucha",
 	"license": "ISC",
@@ -27,11 +31,16 @@
 	"dependencies": {
 		"@types/react": "^18.0.14",
 		"@types/react-dom": "^18.0.5",
+		"chart.js": "^3.8.0",
 		"css-loader": "^6.7.1",
+		"date-fns": "^2.28.0",
 		"file-loader": "^6.2.0",
+		"fuse.js": "^6.6.2",
 		"node-loader": "^2.0.0",
 		"node-zip": "^1.1.1",
 		"react": "^18.2.0",
+		"react-chartjs-2": "^4.2.0",
+		"react-date-range": "^1.4.0",
 		"react-dom": "^18.2.0",
 		"sass": "^1.53.0",
 		"sass-loader": "^13.0.2",

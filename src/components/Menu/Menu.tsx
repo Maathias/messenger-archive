@@ -2,8 +2,14 @@ import { useState } from 'react'
 import './menu.sass'
 import icon from '../../../assets/icon.png'
 
-function Menu({ setPane }: { setPane: (id: string) => void }) {
-	const [active, setActive] = useState('convo')
+function Menu({
+	setPane,
+	initial,
+}: {
+	setPane: (id: string) => void
+	initial: string
+}) {
+	const [active, setActive] = useState(initial)
 
 	const options = [
 			['convo', 'chat-empty', 'View conversation'],
@@ -12,6 +18,7 @@ function Menu({ setPane }: { setPane: (id: string) => void }) {
 			['stats', 'chart-bar', 'View statistics'],
 		],
 		bottomOptions = [
+			['selector', 'th-list', 'Select conversation'],
 			['import', 'download', 'Import messages'],
 			['settings', 'cog-alt', 'Settings'],
 		]
@@ -22,10 +29,6 @@ function Menu({ setPane }: { setPane: (id: string) => void }) {
 	}
 
 	return (
-		// view convo
-		// search
-		// view media
-		// stats
 		<div className="menu">
 			<img src={icon} alt="" />
 			<div className="lists">
@@ -50,8 +53,6 @@ function Menu({ setPane }: { setPane: (id: string) => void }) {
 							onClick={() => change(id)}
 						></i>
 					))}
-					{/* <i className="icon-download import"></i>
-          <i className="icon-cog-alt settings"></i> */}
 				</div>
 			</div>
 		</div>

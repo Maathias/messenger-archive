@@ -1,47 +1,83 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 
+import Browse from './components/Browse/Browse'
+import ConvoSelector from './components/ConvoSelector/ConvoSelector'
+import Media from './components/Media/Media'
+import Search from './components/Search/Search'
+import Stats from './components/Stats/Stats'
 import Intro from './components/Intro/Intro'
 import Menu from './components/Menu/Menu'
+
+import contextCurrentConvo from './Contexts/contextCurrentConvo'
+import contextConvos from './Contexts/contextConvos'
+
+import { dateToUnixExtended } from './PartialConvo'
+import Convo from '../ts/Convo'
 
 import './index.css'
 
 const contextPane = createContext('')
 
 function Pane({ children, id }: any) {
-  const pane = useContext(contextPane)
+	const pane = useContext(contextPane)
 
-  console.log(id, pane)
-
-  return (
-    <div className="pane" style={{ display: pane == id ? 'initial' : 'none' }}>
-      {children}
-    </div>
-  )
+	return (
+		<div
+			className="pane"
+			style={{ display: pane == id ? 'initial' : 'none' }}
+		>
+			{children}
+		</div>
+	)
 }
 
-function Main() {
-  const [pane, setPane] = useState('import')
+export default function Main() {
+	const [pane, setPane] = useState('selector'),
+		[convos, setConvos] = useState([])
 
-  // const panes: { [id: string]: JSX.Element } = {
-  //   import: <Intro />,
-  //   scanner: <Scanner />,
-  // }
+	const [currentConvo, setCurrentConvo] = useState<Convo | null>(null)
 
-  return (
-    <div>
-      {/* {pane == 'intro' && }
+	let [range, setRange] = useState<[number, number]>([
+		dateToUnixExtended(new Date()) - 1.296e13,
+		dateToUnixExtended(new Date()),
+	])
 
-      {pane == 'scanning' && } */}
+	useEffect(() => {
+		// TODO: check if there are any already scanned convos
+		window.events.on('update-convos-ids', convos => setConvos(convos))
+	}, [])
 
-      <Menu setPane={id => setPane(id)} />
+	async function changeConvo(id: string) {
+		let data = await window.invoke('get-convo', id)
+		data = JSON.parse(data)
+		setCurrentConvo(data)
+	}
 
-      <div className="container">
-        <contextPane.Provider value={pane}>
-          <Pane id="import" children={<Intro />} />
-        </contextPane.Provider>
-      </div>
-    </div>
-  )
+	return (
+		<div>
+			<Menu setPane={id => setPane(id)} initial={pane} />
+
+			<div className="container">
+				<contextConvos.Provider value={convos}>
+					<contextCurrentConvo.Provider
+						value={[
+							[currentConvo, changeConvo],
+							[range, setRange],
+						]}
+					>
+						<contextPane.Provider value={pane}>
+							<Pane id="convo" children={<Browse />} />
+							<Pane id="media" children={<Media />} />
+							<Pane id="search" children={<Search />} />
+							<Pane id="stats" children={<Stats />} />
+
+							<Pane id="import" children={<Intro />} />
+							<Pane id="selector" children={<ConvoSelector />} />
+							{/* TODO: settings */}
+						</contextPane.Provider>
+					</contextCurrentConvo.Provider>
+				</contextConvos.Provider>
+			</div>
+		</div>
+	)
 }
-
-export default Main

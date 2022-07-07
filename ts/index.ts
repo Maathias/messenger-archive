@@ -1,3 +1,113 @@
-export function scan(paths: string[], options: any, contact: updateProgress) {
-	console.log(paths)
+import utf8 from 'utf8'
+import Convo from './Convo'
+import Inbox, { findInboxes } from './Inbox'
+
+function counter(n: number) {
+	return [n, 1]
+}
+
+function nextCounter(n: number, c: number) {
+	return Math.floor((c / n) * 100)
+}
+
+export const Convos = {}
+
+export async function scan(
+	paths: string[],
+	options: any, // TODO: pass options from settings
+	contact: updateProgress
+) {
+	contact('main', 'Getting files', 1)
+	contact('sub', 'Searching for inboxes', 0)
+
+	// give some time for the progress bar to render
+	await new Promise(r => setTimeout(r, 500))
+
+	// get all person_1234567890/ directories from selected paths,
+	// and initialize an Inbox for each
+	const inboxes = (
+		await Promise.all(paths.map(path => findInboxes(path)))
+	).flat()
+
+	let [partsN, partsC] = counter(inboxes.length)
+
+	for (let inbox of inboxes)
+		await inbox
+			.loadParts() // load all message_*.json files per Inbox
+			.then(() =>
+				contact('sub', 'Loading inboxes', nextCounter(partsN, partsC++))
+			)
+
+	// estimate the owner between all inboxes,
+	// by getting the most common participant
+	let owner = utf8.decode(
+		Object.entries(
+			inboxes
+				.filter(i => i.meta?.type == 'Regular') // ignore groups
+				.reduce((sum, { meta }) => {
+					// count participant occurrences
+					meta!.participants.forEach(p =>
+						sum[p] ? sum[p]++ : (sum[p] = 1)
+					)
+					return sum
+				}, {} as { [name: string]: number })
+		).reduce(
+			// reduce to the most common participant
+			([name, count], next) => (next[1] > count ? next : [name, count]),
+			['', 0]
+		)[0]
+	)
+
+	contact('main', 'Assembling conversations', 2)
+	contact('sub', 'Merging inboxes', 0)
+
+	const groupedInboxes: {
+		[id: string]: Inbox[]
+	} = {}
+
+	// group into arrays based on Inbox.id,
+	// this ensures no duplicates if,there are multiple parts with the same inbox
+	for (let inbox of inboxes) {
+		if (!groupedInboxes[inbox.id]) groupedInboxes[inbox.id] = []
+		groupedInboxes[inbox.id].push(inbox)
+	}
+
+	let [groupedN, groupedC] = counter(Object.keys(groupedInboxes).length)
+
+	const convos: Convo[] = []
+
+	// assign inbox(es) into convos
+	for (let id in groupedInboxes) {
+		contact('sub', 'Assigning messages', nextCounter(groupedN, groupedC++))
+
+		console.time(`join-${id}`) // internal assigning in Convo takes some time
+		convos.push(
+			new Convo( // sort inboxes chronologically
+				groupedInboxes[id].sort((a, b) => b.meta.date - a.meta.date),
+				owner
+			)
+		)
+		console.timeEnd(`join-${id}`)
+	}
+
+	contact('main', 'Generating statistics', 3)
+
+	let [convoN, convoC] = counter(convos.length)
+
+	for (let convo of convos) {
+		contact('sub', `Analyzing ${convo.title}`, nextCounter(convoN, convoC++))
+
+		console.time(`stats-${convo.id}`)
+		await convo.runStats()
+		console.timeEnd(`stats-${convo.id}`)
+	}
+
+	contact('main', 'Finished', 4)
+	contact('sub', 'All tasks ok', 100)
+
+	console.info('scan: ', Convos)
+
+	convos.forEach(c => (Convos[c.id] = c)) // rearrange to global exported object
+
+	return Object.keys(Convos).map(id => ({ id, title: Convos[id].title })) // pass only ids to renderer
 }

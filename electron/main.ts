@@ -1,11 +1,6 @@
 import { app, BrowserWindow } from 'electron'
-import * as path from 'path'
-import * as url from 'url'
+import path from 'path'
 import listeners from './listeners'
-
-import zip from 'node-zip'
-
-console.log(zip)
 
 let mainWindow: Electron.BrowserWindow | null
 

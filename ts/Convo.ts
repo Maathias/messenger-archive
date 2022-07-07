@@ -1,0 +1,189 @@
+import utf8 from 'utf8'
+import { join, normalize } from 'path'
+
+import Inbox from './Inbox'
+import Member from './Member'
+import Message from './Message'
+
+import messagesPerMember from './stats/messagesPerMember'
+import wordsPerMember from './stats/wordsPerMember'
+import messagesPerDay from './stats/messagesPerDay'
+import messagesPerWeekday from './stats/messagesPerWeekday'
+import mediaPerMember from './stats/mediaPerMember'
+import messagesPerHour from './stats/messagesPerHour'
+import mostUsedEmoji from './stats/mostUsedEmoji'
+import mostUsedReactions from './stats/mostUsedReactions'
+import mostUsedWords from './stats/mostUsedWords'
+
+const statParsers = [
+	mediaPerMember,
+	messagesPerDay,
+	messagesPerHour,
+	messagesPerMember,
+	messagesPerWeekday,
+	mostUsedEmoji,
+	// FIXME: some inbox throws an error at ".used"
+	// mostUsedReactions,
+	mostUsedWords,
+	wordsPerMember,
+]
+
+export default class Convo {
+	id: string
+	owner: string
+	type: string
+	members: Member[]
+
+	firstMessage: number
+	lastMessage: number
+
+	getMember: (string) => Member | undefined
+	getOwner: () => Member | undefined
+
+	title: string
+	image?: string
+
+	left?: boolean
+
+	messages: {
+		[sender: string]: {
+			[timestamp: number]: Message
+		}
+	}
+
+	stats: {
+		[stat: string]: any
+	}
+
+	constructor(inboxes: Inbox[], owner: string) {
+		let prim = inboxes[0]
+
+		this.id = prim.id
+		this.owner = owner
+		this.type = prim.meta?.type!
+
+		this.getMember = (name: string) => this.members.find(m => m.name == name)
+		this.getOwner = () => this.getMember(owner)
+
+		!prim.meta!.participates && (this.left = true)
+		this.title = utf8.decode(prim.meta!.title)
+
+		prim.meta!.image &&
+			// make the path absolute
+			(this.image = normalize(
+				join(
+					prim.path,
+					'../../',
+					prim.meta!.image.uri.split('/').slice(1).join('/')
+				)
+			))
+
+		this.members = []
+		this.messages = {}
+		this.stats = {}
+
+		let seenMembers: string[] = [],
+			members: Member[] = [],
+			messages: typeof this.messages = {},
+			firstLastMessage: [number, number] = [Infinity, 0]
+
+		for (const inbox of inboxes) {
+			for (const message of inbox.messages) {
+				let m = new Message(message, inbox.path)
+
+				// find begining and end of messages
+				// FIXME: this could possibly have less impact on execution time,
+				// if its done after sorting the keys
+				if (m.time < firstLastMessage[0]) firstLastMessage[0] = m.time
+				if (m.time > firstLastMessage[1]) firstLastMessage[1] = m.time
+
+				// add new member
+				if (!seenMembers.includes(m.sender)) {
+					seenMembers.push(m.sender)
+					messages[m.sender] = {}
+					members.push(new Member(m.sender, true, m.time))
+				}
+
+				if (m.type?.endsWith('ubscribe'))
+					for (let { name: rawName } of message.users!) {
+						let participates = m.type == 'Subscribe',
+							name = utf8.decode(rawName)
+
+						if (!seenMembers.includes(name)) {
+							seenMembers.push(name)
+							messages[name] = {}
+							members.push(new Member(name, participates, m.time))
+						} else {
+							members
+								.find(member => member.name == name)
+								?.seen(participates, m.time)
+						}
+					}
+
+				messages[m.sender][m.time] = m
+			}
+		}
+
+		// sort keys in messages
+		for (let sender in messages) {
+			this.messages[sender] = Object.fromEntries(
+				Object.entries(messages[sender]).sort(
+					([a], [b]) => parseInt(a) - parseInt(b)
+				)
+			)
+		}
+
+		for (let member of members) {
+			// update the owner
+			if (member.name == owner) member.self = true
+
+			// update participation, based on the last (oldest) inbox.participates
+			// participates = false, points out that the member has sent a message before,
+			// but is no longer added to the conversation
+			if (!prim.meta?.participants.find(p => utf8.decode(p) == member.name))
+				member.participates = false
+		}
+
+		this.members = members
+
+		this.firstMessage = firstLastMessage[0]
+		this.lastMessage = firstLastMessage[1]
+	}
+
+	async runStats() {
+		let prev: { [id: string]: {} } = {}
+
+		// prepare results
+		statParsers.forEach(({ id, begin }) => (prev[id] = begin(this)))
+
+		// for every message run every stat
+		for (const sender in this.messages) {
+			for (const timestamp in this.messages[sender]) {
+				const message = this.messages[sender][timestamp]
+
+				for (let { id, every } of statParsers) {
+					prev[id] = await every(
+						message,
+						this.getMember(sender)!,
+						this,
+						prev[id],
+						prev
+					)
+				}
+			}
+		}
+
+		// cleanup the results
+		statParsers.forEach(
+			({ id, end }) => (prev[id] = end(this, prev[id], prev))
+		)
+
+		for (let id in prev) this.addStat(id, prev[id])
+
+		return
+	}
+
+	private addStat(id, data) {
+		this.stats[id] = data
+	}
+}
