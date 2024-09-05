@@ -10,4 +10,4 @@ An explorer for exported Facebook Messenger messages
 
 `yarn dev` builds and runs project
 
-`web` runs only React in a dev server
+`yarn web` runs only React in a dev server

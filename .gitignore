@@ -3,3 +3,4 @@ build/
 dist/
 ts/lorem.ts
 yarn-error.log
+.directory

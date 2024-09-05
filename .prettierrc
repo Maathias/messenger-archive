@@ -4,5 +4,6 @@
 	"semi": false,
 	"arrowParens": "avoid",
 	"singleQuote": true,
-	"quoteProps": "consistent"
+	"quoteProps": "consistent",
+	"printWidth": 100
 }
