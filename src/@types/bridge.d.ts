@@ -1,4 +1,5 @@
 import { events, invoke } from '../../electron/preload'
+import { E_DATABASE } from '../events'
 
 declare global {
 	// eslint-disable-next-line

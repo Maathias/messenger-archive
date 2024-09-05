@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import path from 'path'
 import listeners from './listeners'
+import { closeDB } from '../ts/Database'
 
 let mainWindow: Electron.BrowserWindow | null
 
@@ -11,11 +12,13 @@ function createWindow() {
 		icon: 'assets/icon.png',
 		backgroundColor: '#efe9f4',
 		webPreferences: {
-			nodeIntegration: false,
+			nodeIntegration: true,
 			contextIsolation: true,
 			preload: path.join(__dirname, 'preload.js'),
 		},
 	})
+	// mainWindow.loadURL('http://localhost:8080')
+	// mainWindow.webContents.openDevTools()
 
 	mainWindow.loadFile('build/index.html')
 
@@ -32,6 +35,7 @@ app.on('ready', createWindow)
 app.on('window-all-closed', () => {
 	if (process.platform !== 'darwin') {
 		app.quit()
+		closeDB()
 	}
 })
 

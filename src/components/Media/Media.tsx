@@ -1,19 +1,19 @@
 import { useContext, useEffect, useState } from 'react'
-import Message from '../../../ts/Message'
-import { messageMedia } from '../../../ts/types/takeout'
-import contextCurrentConvo from '../../Contexts/contextCurrentConvo'
-import PartialConvo from '../../PartialConvo'
 
 import './media.sass'
+import contextCurrentInbox from '../../Contexts/contextCurrentInbox'
+import { Inbox, Message } from '../../Sources'
 
 function Entry({
-	type,
-	content,
+	media,
 	message,
 	goto,
 }: {
-	type: string
-	content: messageMedia
+	media: {
+		type: string
+		uri: string
+		creation_timestamp: number
+	}
 	message: Message
 	goto: (number) => void
 }) {
@@ -26,48 +26,37 @@ function Entry({
 					{
 						photos: <i className="icon-picture"></i>,
 						gifs: <i className="icon-picture"></i>,
-						audios: <i className="icon-mic"></i>,
 						videos: <i className="icon-video"></i>,
+						audio_files: <i className="icon-mic"></i>,
 						files: <i className="icon-attach"></i>,
-					}[type]
+					}[media.type]
 				}
-				{message.sender} &mdash;&nbsp;
-				{new Date(message.time / 1e3).toLocaleDateString()}
+				{message.sender_name} &mdash;&nbsp;
+				{new Date(message.timestamp_ms).toLocaleDateString()}
 			</div>
 
 			{open && (
 				<div className="preview">
-					{
-						{
-							photos: (
-								<img src={content.uri} alt="unable to load image" />
-							),
-							gifs: <img src={content.uri} alt="unable to load gif" />,
-							audios: (
-								<audio controls>
-									<source src={content.uri} />
-								</audio>
-							),
-							videos: (
-								<video controls>
-									<source src={content.uri} />
-								</video>
-							),
-							files: <i className="icon-attach"></i>,
-						}[type]
-					}
+					{{
+						photos: () => <img src={media.uri} alt="unable to load image" />,
+						gifs: () => <img src={media.uri} alt="unable to load gif" />,
+						audios: () => (
+							<audio controls>
+								<source src={media.uri} />
+							</audio>
+						),
+						videos: () => (
+							<video controls>
+								<source src={media.uri} />
+							</video>
+						),
+						files: () => <i className="icon-attach"></i>,
+					}[media.type]()}
 
 					<div className="info">
-						<div>
-							Time: {new Date(message.time / 1e3).toLocaleTimeString()}
-						</div>
-						{content.creation_timestamp && (
-							<div>
-								Created:{' '}
-								{new Date(
-									content.creation_timestamp * 1e3
-								).toLocaleString()}
-							</div>
+						<div>Time: {new Date(message.timestamp_ms).toLocaleTimeString()}</div>
+						{media.creation_timestamp && (
+							<div>Created: {new Date(media.creation_timestamp).toLocaleString()}</div>
 						)}
 						<div></div>
 						<div></div>
@@ -98,33 +87,46 @@ function Preview() {
 // TODO: add optional grid view
 
 export default function Media() {
-	const [[currentConvo], [range, setRange]] = useContext(contextCurrentConvo)
-
-	const [partial, setPartial] = useState<PartialConvo>()
-
-	useEffect(() => {
-		if (currentConvo) setPartial(new PartialConvo(currentConvo, range))
-	}, [currentConvo, range])
+	const [currentInbox, changeInbox, range] = useContext(contextCurrentInbox)
 
 	return (
 		<div className="media">
-			{partial &&
-				partial.messages
-					.filter(({ media }) => media)
-					.map(message =>
-						Object.entries(message.media!).map(([type, entries]) =>
-							entries.map(e => (
-								<Entry
-									key={e.uri}
-									type={type}
-									content={e}
-									message={message}
-									goto={() => {}} /* TODO: add goto in conversation feature */
-								/>
-							))
+			{
+				currentInbox &&
+					currentInbox.messages
+						.filter(
+							message =>
+								Object.keys(message).filter(key => Inbox.mediaKeys.includes(key)).length > 0
 						)
-					)
-					.flat()}
+						.map(message =>
+							Object.entries(message)
+								.filter(([key, value]) => Inbox.mediaKeys.includes(key))
+								.map(([type, value]) => ({
+									type,
+									...value,
+								}))
+								.flat()
+								.map(media => [media, message])
+						)
+						.flat(3)
+						.map(([media, message]) => {
+							return <Entry media={media} message={message} goto={() => {}} />
+						})
+				// .map(media =>
+				// 	Object.entries(message.media!).map(([type, entries]) =>
+				// 		entries.map(e => (
+				// 			<Entry
+				// 				key={e.uri}
+				// 				type={type}
+				// 				content={e}
+				// 				message={message}
+				// 				goto={() => {}} /* TODO: add goto in conversation feature */
+				// 			/>
+				// 		))
+				// 	)
+				// )
+				// .flat()}
+			}
 		</div>
 	)
 }

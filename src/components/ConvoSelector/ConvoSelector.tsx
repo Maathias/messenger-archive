@@ -1,20 +1,35 @@
 import { useContext, useEffect, useState } from 'react'
 import { DateRangePicker } from 'react-date-range'
 
-import { dateToUnixExtended } from '../../PartialConvo'
-
-import contextCurrentConvo from '../../Contexts/contextCurrentConvo'
-import contextConvos from '../../Contexts/contextConvos'
+import contextCurrentInbox from '../../Contexts/contextCurrentInbox'
+import contextInboxes from '../../Contexts/contextInboxes'
 
 import './convoselector.sass'
 
 import 'react-date-range/dist/styles.css' // picker main style file
 import 'react-date-range/dist/theme/default.css' // picker theme css file
+import { Avatar, FormControl, InputLabel, ListSubheader, MenuItem, Select } from '@mui/material'
+import BlobMedia from '../BlobMedia/BlobMedia'
+import { stringAvatar } from '../universal'
+
+const categoryLookup = {
+		e2ee_cutover: 'Inboxes Encrypted',
+		inbox: 'Inboxes',
+		archived_threads: 'Archived',
+		message_requests: 'Requests',
+		filtered_threads: 'Filtered',
+	},
+	categoryOrder = [
+		'e2ee_cutover',
+		'inbox',
+		'archived_threads',
+		'message_requests',
+		'filtered_threads',
+	]
 
 function ConvoSelector() {
-	const convos = useContext(contextConvos),
-		[[currentConvo, setCurrentConvo], [range, setRange]] =
-			useContext(contextCurrentConvo)
+	const [inboxes] = useContext(contextInboxes),
+		[currentInbox, changeInbox, , setRange] = useContext(contextCurrentInbox)
 
 	const [picker, setPicker] = useState({
 		startDate: new Date(new Date().getTime() - 3.024e9),
@@ -22,66 +37,86 @@ function ConvoSelector() {
 		key: 'selection',
 	})
 
+	let separator = label => <ListSubheader color="primary">{label}</ListSubheader>
+
 	useEffect(() => {
-		setRange([
-			dateToUnixExtended(picker.startDate),
-			dateToUnixExtended(picker.endDate) + 8.64e10,
-		])
+		setRange([picker.startDate.getTime(), picker.endDate.getTime() + 8.64e7])
 	}, [picker])
 
 	return (
 		<div className="selector">
 			<div className="select">
-				<span>Select an inbox: </span>
-				<select
-					onChange={({ target: { value } }) => setCurrentConvo(value)}
-					defaultValue={currentConvo?.id}
-				>
-					{convos
-						.sort((a, b) => a.title.localeCompare(b.title))
-						.map(c => (
-							<option key={c.id} value={c.id}>
-								{c.title}
-							</option>
-						))}
-				</select>
+				<FormControl fullWidth>
+					<InputLabel id="select-label">Select an inbox</InputLabel>
+					<Select
+						labelId="select-label"
+						value={currentInbox?.id || ''}
+						label="Inbox"
+						onChange={({ target: { value } }) => changeInbox(value)}
+					>
+						{inboxes
+							// .sort((a, b) => a.category.localeCompare(b.category))
+							// .sort((a, b) => a.title.localeCompare(b.title))
+							.sort((a, b) => {
+								let category =
+										categoryOrder.indexOf(a.category) - categoryOrder.indexOf(b.category),
+									title = a.title.localeCompare(b.title)
+
+								return category || title
+							})
+							.map((current, i, all) => {
+								let children = [
+									<MenuItem value={current.id} key={current.id}>
+										{current.title}
+									</MenuItem>,
+								]
+
+								if (i == 0) children.unshift(separator(categoryLookup[current.category]))
+								else {
+									if (all[i - 1].category != current.category)
+										children.unshift(separator(categoryLookup[current.category]))
+								}
+								return children
+							})}
+					</Select>
+				</FormControl>
 			</div>
 
-			{currentConvo && (
+			{currentInbox && (
 				<div className="preview">
-					<h2>{currentConvo.title}</h2>
+					<h2>{currentInbox.title}</h2>
 					<div className="desc">
-						<img src={currentConvo.image ?? ''} alt="photo unavailable" />
+						<div className="photo">
+							{currentInbox.image ? (
+								<div className="img">
+									<BlobMedia uri={currentInbox.image.uri} mediaType="group_photos" />
+								</div>
+							) : (
+								<Avatar {...stringAvatar(currentInbox.title)} />
+							)}
+						</div>
+
 						<table>
 							<tbody>
 								<tr>
 									<td>Title</td>
-									<td>{currentConvo.title}</td>
+									<td>{currentInbox.title}</td>
 								</tr>
-								<tr>
+								{/* <tr>
 									<td>Type</td>
 									<td>{currentConvo.type}</td>
-								</tr>
+								</tr> */}
 								<tr>
 									<td>Category</td>
-									<td>{'inbox'}</td>
-									{/* TODO: pass category to convo from inbox */}
+									<td>{currentInbox.category}</td>
 								</tr>
 								<tr>
 									<td>First Message</td>
-									<td>
-										{new Date(
-											currentConvo.firstMessage / 1e3
-										).toLocaleString()}
-									</td>
+									<td>{new Date(currentInbox.meta.firstMessage).toLocaleString()}</td>
 								</tr>
 								<tr>
 									<td>Last Message</td>
-									<td>
-										{new Date(
-											currentConvo.lastMessage / 1e3
-										).toLocaleString()}
-									</td>
+									<td>{new Date(currentInbox.meta.lastMessage).toLocaleString()}</td>
 								</tr>
 							</tbody>
 						</table>
@@ -89,9 +124,9 @@ function ConvoSelector() {
 					<h2>Members</h2>
 					<div className="members">
 						<ul>
-							{currentConvo.members.map(m => (
+							{currentInbox.participants.map(m => (
 								<li
-									key={m.name}
+									key={m.name + currentInbox.id}
 									data-left={!m.participates}
 									data-self={m.self}
 								>
@@ -103,15 +138,15 @@ function ConvoSelector() {
 				</div>
 			)}
 
-			{currentConvo && (
+			{currentInbox && (
 				<div className="picker">
 					<h1>Select a range for displayed messages:</h1>
 					<DateRangePicker
 						onChange={item => setPicker(item.selection)}
 						showSelectionPreview={true}
 						moveRangeOnFirstSelection={false}
-						minDate={new Date(currentConvo.firstMessage / 1e3)}
-						maxDate={new Date(currentConvo.lastMessage / 1e3)}
+						minDate={new Date(currentInbox.meta.firstMessage)}
+						maxDate={new Date(currentInbox.meta.lastMessage)}
 						ranges={[picker]}
 						direction="vertical"
 					/>

@@ -1,22 +1,20 @@
 import 'chart.js/auto'
 
 import { useContext, useEffect, useState } from 'react'
-import contextCurrentConvo from '../../Contexts/contextCurrentConvo'
 
 import './stats.sass'
 
-import messagesPerDay from './messages-per-day'
-import messagesPerMember from './messages-per-member'
+import * as _views from './views'
+
+import contextCurrentInbox from '../../Contexts/contextCurrentInbox'
+import { FormControl, InputLabel, MenuItem, Select } from '@mui/material'
 
 // TODO: add missing renderers
-
-const renderers = {
-	messagesPerDay,
-	messagesPerMember,
-}
+const views = _views as _views.Views
 
 export default function Stats() {
-	const [[currentConvo]] = useContext(contextCurrentConvo)
+	const [currentInbox] = useContext(contextCurrentInbox),
+		[rawStats, setRawStats] = useState<object | null>(null)
 
 	const [statName, setStatName] = useState(''),
 		[chartStyle, setChartStyle] = useState('')
@@ -26,54 +24,78 @@ export default function Stats() {
 
 	useEffect(() => setChartStyle(''), [statName])
 
+	useEffect(() => {
+		if (currentInbox && statName) {
+			currentInbox.getStats(statName).then(setRawStats)
+		}
+	}, [currentInbox, statName])
+
 	return (
 		<div className="stats">
 			<div className="settings">
-				<select onChange={e => setStatName(e.target.value)}>
-					<option value="">select a stat</option>
-					{Object.entries(renderers).map(([id, { label }]) => (
-						<option key={id} value={id}>
-							{label}
-						</option>
-					))}
-				</select>
+				<FormControl fullWidth>
+					<InputLabel id="select-stat">Select a statistic</InputLabel>
+					<Select
+						labelId="select-stat"
+						value={statName}
+						label="Select a statistic"
+						onChange={e => setStatName(e.target.value)}
+					>
+						{Object.entries(_views).map(([id, view]) => (
+							<MenuItem key={id} value={id}>
+								{view.label}
+							</MenuItem>
+						))}
+					</Select>
+				</FormControl>
 
-				{statName && (
-					<select onChange={e => setChartStyle(e.target.value)}>
-						<option value="">select a chart</option>
+				<br />
 
-						{Object.entries(renderers[statName])
-							.filter(([, renderer]) => typeof renderer == 'function')
-							.map(([id]) => (
-								<option key={id} value={id}>
-									{id}
-								</option>
-							))}
-					</select>
-				)}
+				<FormControl fullWidth>
+					{statName && (
+						<>
+							<InputLabel id="select-chart">Select a chart</InputLabel>
+							<Select
+								labelId="select-chart"
+								value={chartStyle}
+								label="Select a chart"
+								onChange={e => setChartStyle(e.target.value)}
+							>
+								{Object.keys(views[statName].renderers)
+									// .filter(([name, renderer]) => typeof renderer == 'function')
+									.map(id => (
+										<MenuItem key={id} value={id}>
+											{id}
+										</MenuItem>
+									))}
+							</Select>
+						</>
+					)}
 
-				{chartStyle && (
-					<div>
-						Stacked:&nbsp;
-						<input
-							type="checkbox"
-							defaultChecked={stacked}
-							onChange={e => setStacked(e.target.checked)}
-						/>
-					</div>
-				)}
+					{chartStyle && (
+						<>
+							{/* <div>
+									Stacked:&nbsp;
+									<input
+										type="checkbox"
+										defaultChecked={stacked}
+										onChange={e => setStacked(e.target.checked)}
+									/>
+								</div> */}
+						</>
+					)}
+				</FormControl>
 			</div>
+
 			<div className="view">
-				{currentConvo ? (
+				{currentInbox ? (
 					statName ? (
 						chartStyle ? (
-							currentConvo.stats[statName] ? (
-								renderers[statName][chartStyle] ? (
-									//
-									renderers[statName][chartStyle]({
-										// FIXME: charts often overflow offscreen
-										convo: currentConvo,
-										data: currentConvo.stats[statName],
+							rawStats ? (
+								views[statName].renderers[chartStyle] ? (
+									views[statName].renderers[chartStyle]({
+										inbox: currentInbox,
+										rawStats,
 										options: [stacked, year],
 									})
 								) : (

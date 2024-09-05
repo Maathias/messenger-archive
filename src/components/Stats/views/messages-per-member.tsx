@@ -1,8 +1,17 @@
 import { Doughnut } from 'react-chartjs-2'
 
-import { hueFromString, statRendererProps } from '../../../ts/types/Stat'
+import { hueFromString } from '../common'
+import Inbox from '../../../../ts/Inbox'
 
-export function donut({ data }: statRendererProps) {
+function donut({
+	inbox,
+	rawStats,
+	options: [stacked, year],
+}: {
+	inbox: Inbox
+	rawStats: any
+	options: [boolean, number]
+}) {
 	return (
 		<>
 			<h1>Messages per member</h1>
@@ -10,12 +19,12 @@ export function donut({ data }: statRendererProps) {
 				<Doughnut
 					about="asdf"
 					data={{
-						labels: Object.keys(data),
+						labels: Object.keys(rawStats),
 						datasets: [
 							{
 								label: 'Messages',
-								data: Object.values(data),
-								backgroundColor: Object.keys(data).map(
+								data: Object.values(rawStats),
+								backgroundColor: Object.keys(rawStats).map(
 									n => `hsl(${hueFromString(n)}deg, 50%, 50%)`
 								),
 							},
@@ -28,7 +37,7 @@ export function donut({ data }: statRendererProps) {
 }
 
 export default {
+	renderers: { donut },
 	label: 'Messages per member',
 	desc: 'Total number of messages sent by each member',
-	donut,
 }

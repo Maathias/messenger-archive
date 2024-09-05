@@ -5,9 +5,11 @@ import icon from '../../../assets/icon.png'
 function Menu({
 	setPane,
 	initial,
+	dbReady,
 }: {
 	setPane: (id: string) => void
 	initial: string
+	dbReady: boolean
 }) {
 	const [active, setActive] = useState(initial)
 
@@ -37,9 +39,10 @@ function Menu({
 						<i
 							key={id}
 							data-active={id == active}
+							data-disabled={!dbReady}
 							className={`icon-${icon}`}
 							title={title}
-							onClick={() => change(id)}
+							onClick={() => dbReady && change(id)}
 						></i>
 					))}
 				</div>
