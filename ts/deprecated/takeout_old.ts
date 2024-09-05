@@ -6,19 +6,19 @@ export type unescapedString = string
 export type messagesPart = {
 	title: unescapedString
 	thread_path: string
-	thread_type: string
-	participants: { name: unescapedString }[]
-	magic_words: []
-	messages: (message & messageWithMedia)[]
-	image?: {
-		uri: string
-		creation_timestamp: timestampSeconds
-	}
 	is_still_participant: boolean
+	magic_words: []
 	joinable_mode: {
 		mode: number
 		link: string
 	}
+	image?: {
+		uri: string
+		creation_timestamp: timestampSeconds
+	}
+
+	participants: { name: unescapedString }[]
+	messages: message[]
 }
 
 export type message = {
@@ -50,6 +50,12 @@ export type message = {
 	sticker?: {
 		uri: string
 	}
+
+	photos?: messageMedia[]
+	audio_files?: messageMedia[]
+	files?: messageMedia[]
+	gifs?: (messageMedia & { creation_timestamp: never })[]
+	videos?: (messageMedia & { thumbnail: { uri: string } })[]
 }
 
 export type messageWithMedia = {

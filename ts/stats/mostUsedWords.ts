@@ -1,26 +1,22 @@
-import {
-	prepStatResults,
-	sortObjectbyValueNumber,
-	statParser,
-} from '../types/Stat'
+import Inbox from '../Inbox'
+import Message from '../Message'
+import { prepPerMember, StatParser } from './StatParser'
 
-export default {
-	id: 'mostUsedWords',
+export default class mostUsedWords implements StatParser {
+	id = 'mostUsedWords'
+	results
 
-	begin: ({ members }) => prepStatResults(members, () => ({})),
+	constructor(inbox: Inbox) {
+		this.results = prepPerMember(inbox.participants, () => ({}))
+	}
 
-	every: (message, member, convo, prev) => {
-		if (message.content.length > 0)
+	every(message: Message) {
+		if (message.content.length > 0) {
+			let sender = message.sender_name
 			message.content.split(' ').forEach(word => {
-				if (prev[member.name][word]) prev[member.name][word] += 1
-				else prev[member.name][word] = 1
+				if (this.results[sender][word]) this.results[sender][word] += 1
+				else this.results[sender][word] = 1
 			})
-		return prev
-	},
-
-	end: (convo, prev) => {
-		for (let name in prev) prev[name] = sortObjectbyValueNumber(prev[name])
-
-		return prev
-	},
-} as statParser
+		}
+	}
+}

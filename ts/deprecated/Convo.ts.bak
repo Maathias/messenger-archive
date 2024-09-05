@@ -31,7 +31,8 @@ const statParsers = [
 export default class Convo {
 	id: string
 	owner: string
-	type: string
+	// type: string
+	category: string
 	members: Member[]
 
 	firstMessage: number
@@ -60,7 +61,8 @@ export default class Convo {
 
 		this.id = prim.id
 		this.owner = owner
-		this.type = prim.meta?.type!
+		// this.type = prim.meta?.type!
+		this.category = prim.category
 
 		this.getMember = (name: string) => this.members.find(m => m.name == name)
 		this.getOwner = () => this.getMember(owner)

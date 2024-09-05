@@ -1,14 +1,16 @@
-import { prepStatResults, statParser } from '../types/Stat'
+import Inbox from '../Inbox'
+import Message from '../Message'
+import { prepPerMember, StatParser } from './StatParser'
 
-export default {
-	id: 'messagesPerMember',
+export default class messagesPerMember implements StatParser {
+	id = 'messagesPerMember'
+	results
 
-	begin: ({ members }) => prepStatResults(members, () => 0),
+	constructor(inbox: Inbox) {
+		this.results = prepPerMember(inbox.participants, () => 0)
+	}
 
-	every: (message, member, convo, prev) => {
-		prev[member.name] += 1
-		return prev
-	},
-
-	end: (convo, prev) => prev,
-} as statParser
+	every(message: Message) {
+		this.results[message.sender_name] += 1
+	}
+}

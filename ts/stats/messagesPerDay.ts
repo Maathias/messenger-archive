@@ -1,13 +1,32 @@
-import { monthsEmpty, prepStatResults, statParser } from '../types/Stat'
+import Inbox from '../Inbox'
+import Message from '../Message'
+import { prepPerMember, StatParser } from './StatParser'
 
-export default {
-	id: 'messagesPerDay',
+const monthsEmpty = (): 0[][] => [
+	new Array(31).fill(0),
+	new Array(29).fill(0), // FIXME: this will cause problems
+	new Array(31).fill(0),
+	new Array(30).fill(0),
+	new Array(31).fill(0),
+	new Array(30).fill(0),
+	new Array(31).fill(0),
+	new Array(31).fill(0),
+	new Array(30).fill(0),
+	new Array(31).fill(0),
+	new Array(30).fill(0),
+	new Array(31).fill(0),
+]
 
-	begin: ({ firstMessage, lastMessage, members }) => {
-		let firstYear = new Date(firstMessage / 1e3).getFullYear(),
-			lastYear = new Date(lastMessage / 1e3).getFullYear()
+export default class messagesPerDay implements StatParser {
+	id = 'messagesPerDay'
+	results
 
-		return prepStatResults(members, () => {
+	constructor(inbox: Inbox) {
+		let firstYear = new Date(inbox.meta.firstMessage).getFullYear(),
+			lastYear = new Date(inbox.meta.lastMessage).getFullYear()
+		// FIXME: dynamic year range
+
+		this.results = prepPerMember(inbox.participants, () => {
 			let prep: {
 				[year: string]: number[][]
 			} = {}
@@ -16,18 +35,14 @@ export default {
 			}
 			return prep
 		})
-	},
+	}
 
-	every: (message, member, convo, prev) => {
-		let date = new Date(message.time / 1e3),
+	every(message: Message) {
+		let date = new Date(message.timestamp_ms),
 			y = date.getFullYear(),
 			m = date.getMonth(),
 			d = date.getDate()
 
-		prev[member.name][y][m][d - 1] += 1
-
-		return prev
-	},
-
-	end: (convo, prev) => prev,
-} as statParser
+		this.results[message.sender_name][y][m][d - 1] += 1
+	}
+}

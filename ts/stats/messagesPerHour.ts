@@ -1,14 +1,16 @@
-import { prepStatResults, statParser } from '../types/Stat'
+import Inbox from '../Inbox'
+import Message from '../Message'
+import { prepPerMember, StatParser } from './StatParser'
 
-export default {
-	id: 'messagesPerHour',
+export default class messagesPerHour implements StatParser {
+	id = 'messagesPerHour'
+	results
 
-	begin: ({ members }) => prepStatResults(members, () => Array(24).fill(0)),
+	constructor(inbox: Inbox) {
+		this.results = prepPerMember(inbox.participants, () => Array(24).fill(0))
+	}
 
-	every: (message, member, convo, prev, other) => {
-		prev[member.name][new Date(message.time / 1e3).getHours()] += 1
-		return prev
-	},
-
-	end: (convo, prev, other) => prev,
-} as statParser
+	every(message: Message) {
+		this.results[message.sender_name][new Date(message.timestamp_ms / 1e3).getHours()] += 1
+	}
+}

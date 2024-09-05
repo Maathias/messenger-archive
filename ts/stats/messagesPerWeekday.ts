@@ -1,15 +1,16 @@
-import { prepStatResults, statParser } from '../types/Stat'
+import Inbox from '../Inbox'
+import Message from '../Message'
+import { prepPerMember, StatParser } from './StatParser'
 
-export default {
-	id: 'messagesPerWeekday',
+export default class messagesPerWeekday implements StatParser {
+	id = 'messagesPerWeekday'
+	results
 
-	begin: ({ members }) =>
-		prepStatResults(members, () => [0, 0, 0, 0, 0, 0, 0]),
+	constructor(inbox: Inbox) {
+		this.results = prepPerMember(inbox.participants, () => new Array(7).fill(0))
+	}
 
-	every: (message, member, convo, prev) => {
-		prev[member.name][new Date(message.time / 1e3).getDay()] += 1
-		return prev
-	},
-
-	end: (convo, prev) => prev,
-} as statParser
+	every(message: Message) {
+		this.results[message.sender_name][new Date(message.timestamp_ms).getDay()] += 1
+	}
+}

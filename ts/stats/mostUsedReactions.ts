@@ -1,34 +1,23 @@
-import {
-	prepStatResults,
-	sortObjectbyValueNumber,
-	statParser,
-} from '../types/Stat'
+import Message from '../Message'
+import { prepPerMember, StatParser } from './StatParser'
 
-export default {
-	id: 'mostUsedReactions',
+export default class mostUsedReactions implements StatParser {
+	id = 'mostUsedReactions'
+	results
 
-	begin: ({ members }) =>
-		prepStatResults(members, () => ({ got: {}, used: {} })),
+	constructor(inbox) {
+		this.results = prepPerMember(inbox.participants, () => ({ got: {}, used: {} }))
+	}
 
-	every: (message, member, convo, prev) => {
+	every(message: Message) {
 		if (message.reactions) {
 			for (let { reaction, actor } of message.reactions) {
-				const got = prev[member.name].got,
-					used = prev[actor].used
+				const got = this.results[message.sender_name].got,
+					used = this.results[actor].used
 
 				got[reaction] = got[reaction] + 1 || 1
 				used[reaction] = used[reaction] + 1 || 1
 			}
 		}
-
-		return prev
-	},
-
-	end: (convo, prev) => {
-		for (let { name } of convo.members) {
-			prev[name].got = sortObjectbyValueNumber(prev[name].got)
-			prev[name].used = sortObjectbyValueNumber(prev[name].used)
-		}
-		return prev
-	},
-} as statParser
+	}
+}

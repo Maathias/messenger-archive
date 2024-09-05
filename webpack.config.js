@@ -1,6 +1,5 @@
 const HtmlWebpackPlugin = require('html-webpack-plugin')
 
-// webpack.config.js
 module.exports = [
 	{
 		mode: 'development',
@@ -13,7 +12,6 @@ module.exports = [
 			rules: [
 				{
 					test: /\.ts$/,
-					// include: /src/,
 					use: [{ loader: 'ts-loader' }],
 				},
 				{
@@ -26,6 +24,10 @@ module.exports = [
 			path: __dirname + '/build',
 			filename: 'electron.js',
 		},
+		// Mark better-sqlite3 as an external module
+		externals: {
+			'better-sqlite3': 'commonjs better-sqlite3',
+		},
 	},
 	{
 		entry: './electron/preload.ts',
@@ -37,7 +39,6 @@ module.exports = [
 			rules: [
 				{
 					test: /\.ts$/,
-					// include: /src/,
 					use: [{ loader: 'ts-loader' }],
 				},
 			],

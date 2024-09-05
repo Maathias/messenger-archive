@@ -1,15 +1,15 @@
-import { prepStatResults, statParser } from '../types/Stat'
+import { prepPerMember, StatParser } from './StatParser'
 
-export default {
-	id: 'wordsPerMember',
+export default class wordsPerMember implements StatParser {
+	id = 'wordsPerMember'
+	results
 
-	begin: ({ members }) => prepStatResults(members, () => 0),
+	constructor(inbox) {
+		this.results = prepPerMember(inbox.participants, () => 0)
+	}
 
-	every: (message, member, convo, prev) => {
+	every(message) {
 		if (message.content.length > 0)
-			prev[member.name] += message.content.split(' ').length
-		return prev
-	},
-
-	end: (convo, prev) => prev,
-} as statParser
+			this.results[message.sender_name] += message.content.split(' ').length
+	}
+}
