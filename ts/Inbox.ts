@@ -1,106 +1,181 @@
-import fs from 'fs'
-import { join } from 'path'
+import utf8 from 'utf8'
 
-import { message, messagesPart, messageWithMedia } from './types/takeout'
+import { pathOriginalToName, pathOriginalToShort, timestampSecToMs } from './normalizers'
+import Message from './Message'
 
-const inboxIdRegex = /_[^\/]*?$/,
-	inboxCatRegex = /\/([^\/])+\/[^\/]+$/,
-	messagePartRegex = /message_\d+\.json/
+import mediaPerMember from './stats/mediaPerMember'
+import messagesPerDay from './stats/messagesPerDay'
+import messagesPerHour from './stats/messagesPerHour'
+import messagesPerMember from './stats/messagesPerMember'
+import messagesPerWeekday from './stats/messagesPerWeekday'
+import mostUsedEmoji from './stats/mostUsedEmoji'
+import mostUsedReactions from './stats/mostUsedReactions'
+import mostUsedWords from './stats/mostUsedWords'
+import wordsPerMember from './stats/wordsPerMember'
+import { StatParser } from './stats/StatParser'
 
-const scanDirs = [
-	'archived_threads',
-	'filtered_threads',
-	'inbox',
-	'message_requests',
+import RawTakeout from './types/takeout_schema'
+
+const statParsers: (new (inbox: Inbox) => StatParser)[] = [
+	mediaPerMember,
+	// messagesPerDay,
+	// FIXME: somethings wrong with preping
+	messagesPerHour,
+	messagesPerMember,
+	messagesPerWeekday,
+	mostUsedEmoji,
+	mostUsedReactions,
+	mostUsedWords,
+	wordsPerMember,
 ]
 
-export var findInboxes = (path: string): Promise<Inbox[]> =>
-	new Promise((resolve, reject) => {
-		if (!fs.existsSync(path)) return reject("Directory doesn't exist")
+export class Member {
+	name: string
+	participates: boolean
+	self: boolean
 
-		const availableDirs = fs
-			.readdirSync(path)
-			.filter(d => scanDirs.includes(d))
+	constructor(name: string) {
+		this.name = name
+		this.participates = true
+		this.self = false
+	}
+}
 
-		const inboxes: Inbox[] = []
+class Inbox {
+	id: string
+	category: string
 
-		for (let dir of availableDirs) {
-			for (let inbox of fs.readdirSync(join(path, dir))) {
-				inboxes.push(new Inbox(join(path, dir, inbox)))
+	title: string
+	thread_path: string
+	image?: {
+		uri: string
+		creation_timestamp: number
+	}
+
+	is_still_participant: boolean
+	participants: Member[]
+
+	joinable_mode?: {
+		mode: number
+		link: string
+	}
+	magic_words?: any[]
+
+	messages: Message[]
+
+	meta!: {
+		firstMessage: number
+		lastMessage: number
+		owner: string
+	}
+
+	stats: { [statId: string]: StatParser['results'] }
+
+	constructor(fileName: string, raw: RawTakeout) {
+		let seg = raw.thread_path.split('/')
+		this.id = seg[1]
+		this.category = seg[0]
+
+		if (raw.title != '') this.title = utf8.decode(raw.title)
+		else this.title = 'Facebook User'
+		this.thread_path = raw.thread_path
+
+		this.is_still_participant = raw.is_still_participant
+		this.participants = raw.participants.map(p => new Member(utf8.decode(p.name)))
+
+		this.magic_words = raw.magic_words
+
+		if (raw.image) {
+			this.image = {
+				uri: pathOriginalToName(raw.image.uri),
+				creation_timestamp: timestampSecToMs(raw.image.creation_timestamp),
 			}
 		}
 
-		resolve(inboxes)
-	})
-
-export default class Inbox {
-	path: string
-	id: string
-	category: string
-	parts: string[]
-
-	messages: (message & messageWithMedia)[]
-	meta!: {
-		title: string
-		type: string
-		participants: string[]
-		participates: boolean
-		image?: { uri: string; created: number }
-		date: number
-	}
-
-	constructor(path: string) {
-		this.path = path
-		this.id = inboxIdRegex.exec(path)![0].slice(-10)
-		this.category = inboxCatRegex.exec(path)![0]
-		this.parts = []
-		this.messages = []
-
-		this.findParts()
-	}
-
-	private async findParts() {
-		if (this.parts.length != 0) return this.parts
-
-		const availableParts = fs
-			.readdirSync(this.path)
-			.filter(f => f.match(messagePartRegex))
-
-		this.parts.push(
-			...availableParts
-				.filter(p => !this.parts.includes(p))
-				.map(p => join(this.path, p))
-		)
-		return this.parts
-	}
-
-	async loadParts() {
-		if (this.messages.length != 0) return this.messages
-
-		let metas: typeof this.meta[] = []
-
-		for (let partPath of this.parts) {
-			let part: messagesPart = JSON.parse(
-				fs.readFileSync(partPath).toString()
-			)
-
-			metas.push({
-				title: part.title,
-				type: part.thread_type,
-				participants: part.participants.map(p => p.name),
-				participates: part.is_still_participant,
-				date: part.messages.at(-1)?.timestamp_ms ?? 0,
-				image: part.image && {
-					uri: part.image.uri,
-					created: part.image.creation_timestamp,
-				},
-			})
-
-			this.messages.push(...part.messages)
+		if (raw.joinable_mode) {
+			this.joinable_mode = {
+				mode: raw.joinable_mode.mode,
+				link: raw.joinable_mode.link,
+			}
 		}
 
-		this.meta = metas.sort(({ date: a }, { date: b }) => a - b)[0]
+		this.messages = raw.messages.map(message => new Message(message))
 
-		return this.messages
+		this.stats = {}
+	}
+
+	append(raw: RawTakeout) {
+		this.messages.push(...raw.messages.map(message => new Message(message)))
+	}
+
+	finalize(owner: string) {
+		let seenMembers: string[] = this.participants.map(p => p.name),
+			firstMessage = Infinity,
+			lastMessage = -Infinity
+
+		for (const message of this.messages) {
+			// add missing participants
+			if (!seenMembers.includes(message.sender_name)) {
+				seenMembers.push(message.sender_name)
+				this.participants.push(new Member(message.sender_name))
+			}
+
+			if (message.reactions) {
+				for (const { actor } of message.reactions) {
+					if (!seenMembers.includes(actor)) {
+						seenMembers.push(actor)
+						this.participants.push(new Member(actor))
+					}
+				}
+			}
+
+			// TODO: detect leaving members
+
+			// find the first and last message
+			if (message.timestamp_ms > lastMessage) lastMessage = message.timestamp_ms
+			if (message.timestamp_ms < firstMessage) firstMessage = message.timestamp_ms
+		}
+
+		let ownerMember = this.participants.find(p => p.name == owner)
+		if (ownerMember) ownerMember.self = true
+
+		this.meta = {
+			firstMessage,
+			lastMessage,
+			owner,
+		}
+
+		let stats = statParsers.map(parser => new parser(this))
+
+		for (const message of this.messages) {
+			stats.forEach(stat => stat.every(message))
+		}
+
+		stats.forEach(stat => (this.stats[stat.id] = stat.results))
+	}
+
+	export() {
+		return {
+			id: this.id,
+			category: this.category,
+			title: this.title,
+			thread_path: this.thread_path,
+			image: this.image,
+			is_still_participant: this.is_still_participant,
+			participants: this.participants,
+			joinable_mode: this.joinable_mode,
+			magic_words: this.magic_words,
+			meta: this.meta,
+			stats: this.stats,
+			messageCount: this.messages.length,
+		}
+	}
+
+	exportMessages(from: number, to: number) {
+		return this.messages.filter(
+			message => message.timestamp_ms >= from && message.timestamp_ms <= to
+		)
 	}
 }
+
+export default Inbox

@@ -1,115 +1,127 @@
 import utf8 from 'utf8'
-import { join } from 'path'
-import { message, messageMedia, messageWithMedia } from './types/takeout'
 
-export default class Message {
-	sender: string
-	time: number
+import { pathOriginalToShort, timestampSecToMs } from './normalizers'
+
+import { RawTakeoutMessage } from './types/takeout_schema'
+
+class Message {
+	sender_name: string
+	timestamp_ms: number
+	is_geoblocked_for_viewer: boolean
+
 	content: string
+	is_unsent: boolean
 
-	type?: string
-	unsent?: boolean
+	ip?: string
+	call_duration?: number
+	missed?: boolean
 
-	reactions?: {
-		reaction: string
-		actor: string
-	}[]
+	photos?: { uri: string; creation_timestamp: number }[]
+	gifs?: { uri: string }[]
+	videos?: { uri: string; creation_timestamp: number }[]
+	audio_files?: { uri: string; creation_timestamp: number }[]
+	files?: { uri: string; creation_timestamp: number }[]
+	sticker?: { uri: string; ai_stickers: { [k: string]: unknown }[] }
+	share?: { link?: string; share_text?: string }
+	reactions?: { reaction: string; actor: string }[]
 
-	media?: {
-		[type: string]: messageMedia[]
-	}
+	constructor(message: RawTakeoutMessage) {
+		this.sender_name = utf8.decode(message.sender_name)
+		this.timestamp_ms = message.timestamp_ms
+		this.is_geoblocked_for_viewer = message.is_geoblocked_for_viewer
 
-	share?: {
-		link?: string
-		share_text?: string
-	}
+		if (message.content) this.content = utf8.decode(message.content)
+		else this.content = ''
 
-	sticker?: string
+		if (message.is_unsent) this.is_unsent = message.is_unsent
+		else this.is_unsent = false
 
-	call?: {
-		duration?: number
-		missed?: boolean
-	}
+		if (message.ip) this.ip = message.ip
 
-	takenDown?: boolean
+		if (message.call_duration) this.call_duration = message.call_duration
 
-	constructor(raw: message & messageWithMedia, sourceInboxPath: string) {
-		let rootInboxesPath =
-			'/' + sourceInboxPath.split('/').slice(0, -2).join('/')
+		if (message.missed) this.missed = message.missed
 
-		this.sender = utf8.decode(raw.sender_name)
-		this.time = raw.timestamp_ms
-		this.content = utf8.decode(raw.content ?? '')
+		if (message.photos)
+			this.photos = message.photos.map(photo => ({
+				uri: pathOriginalToShort(photo.uri),
+				creation_timestamp: timestampSecToMs(photo.creation_timestamp),
+			}))
 
-		raw.is_unsent && (this.unsent = raw.is_unsent)
-		raw.type != 'Generic' && (this.type = raw.type)
-		raw.share && (this.share = raw.share)
-		raw.sticker &&
-			(this.sticker = join(
-				rootInboxesPath,
-				raw.sticker.uri.split('/').slice(1).join('/')
-			))
+		if (message.gifs)
+			this.gifs = message.gifs.map(gif => ({
+				uri: pathOriginalToShort(gif.uri),
+			}))
 
-		raw.is_taken_down && (this.takenDown = raw.is_taken_down)
+		if (message.videos)
+			this.videos = message.videos.map(video => ({
+				uri: pathOriginalToShort(video.uri),
+				creation_timestamp: timestampSecToMs(video.creation_timestamp),
+			}))
 
-		raw.reactions &&
-			(this.reactions = raw.reactions.map(r => ({
-				actor: utf8.decode(r.actor),
-				reaction: utf8.decode(r.reaction),
-			})))
+		if (message.audio_files)
+			this.audio_files = message.audio_files.map(audio => ({
+				uri: pathOriginalToShort(audio.uri),
+				creation_timestamp: timestampSecToMs(audio.creation_timestamp),
+			}))
 
-		// NOTICE: ignoring raw.ip
+		if (message.files)
+			this.files = message.files.map(file => ({
+				uri: pathOriginalToShort(file.uri),
+				creation_timestamp: timestampSecToMs(file.creation_timestamp),
+			}))
 
-		var parseMediaPath = ({ uri, creation_timestamp }) => ({
-			uri: join(sourceInboxPath, uri.split('/').slice(3).join('/')),
-			creation_timestamp,
-		})
+		if (message.sticker)
+			this.sticker = {
+				uri: pathOriginalToShort(message.sticker.uri),
+				ai_stickers: message.sticker.ai_stickers,
+			}
 
-		// media
-		if (
-			raw.photos ||
-			raw.audio_files ||
-			raw.files ||
-			raw.gifs ||
-			raw.videos
-		) {
-			this.media = {}
+		if (message.share)
+			this.share = {
+				link: message.share.link,
+				share_text: message.share.share_text,
+			}
 
-			raw.photos && (this.media.photos = raw.photos.map(parseMediaPath))
-			raw.audio_files &&
-				(this.media.audios = raw.audio_files.map(parseMediaPath))
-			raw.files && (this.media.files = raw.files.map(parseMediaPath))
-			raw.gifs && (this.media.gifs = raw.gifs.map(parseMediaPath))
-			raw.videos && (this.media.videos = raw.videos.map(parseMediaPath))
-		}
+		if (message.reactions)
+			this.reactions = message.reactions.map(reaction => ({
+				reaction: utf8.decode(reaction.reaction),
+				actor: utf8.decode(reaction.actor),
+			}))
 
-		if (raw.call_duration || raw.missed || raw.type == 'Call') {
-			this.call = {
-				duration: raw.call_duration,
-				missed: raw.missed,
+		if (this.content == '') {
+			if (this.photos) {
+				if (this.photos.length > 1) {
+					this.content = `Sent ${this.photos.length} photos`
+				} else this.content = 'Sent a photo'
+			}
+			if (this.gifs) {
+				if (this.gifs.length > 1) {
+					this.content = `Sent ${this.gifs.length} gifs`
+				} else this.content = 'Sent a gif'
+			}
+			if (this.videos) {
+				this.content = 'Sent a video'
+			}
+			if (this.audio_files) {
+				this.content = 'Sent an audio file'
+			}
+			if (this.files) {
+				if (this.files.length > 1) {
+					this.content = `Sent ${this.files.length} files`
+				} else this.content = 'Sent a file'
+			}
+			if (this.sticker) {
+				this.content = 'Sent a sticker'
+			}
+			if (this.missed) {
+				this.content = 'Unanswered call'
+			}
+			if (this.call_duration) {
+				this.content = `Call lasted ${this.call_duration} seconds`
 			}
 		}
-
-		this.extendTime()
-	}
-
-	extendTime() {
-		let stringTime = this.time.toString()
-
-		if (stringTime.length != 13) return
-
-		let total = 0
-
-		// sum all character codes
-		for (let c = 0; c < this.content.length; c++)
-			total += this.content.charCodeAt(c)
-
-		// limit to 3 digits
-		total %= 1000
-
-		// append to end of current timestamp
-		stringTime += total.toString().padStart(3, '0')
-
-		this.time = parseInt(stringTime)
 	}
 }
+
+export default Message
